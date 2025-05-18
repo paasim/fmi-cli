@@ -1,0 +1,44 @@
+[project]
+name = "fmi_cli"
+version = "0.1.0"
+description = "Query for FMI data"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [ "requests>=2" ]
+
+[dependency-groups]
+dev = ["deptry", "pyright", "pytest", "ruff"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff]
+# Same as Black.
+line-length = 88
+indent-width = 4
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "D203", "D213", # conflicts with other formatters
+  "ISC001", "COM812", # conflicts with other formatters
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["D104", "PLC0414"] # init-files can re-export, dont need docs
+"**/tests/*" = [
+  "D", # documentation
+  "ANN201", # type annotations not required
+  "INP001", # no init
+  "S101" # asserts
+]
+
+[tool.pytest.ini_options]
+pythonpath = "."
+
+[tool.setuptools]
+packages = ["fmi_cli"]
