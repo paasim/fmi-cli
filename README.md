@@ -113,3 +113,16 @@ for q in queries.find_matches("forecast")[:8]:
 for q in queries.find_matches("meps.*simple"):
     print(q)
 ```
+
+### Logging
+
+`fmi_cli` defines a logger with the name `"fmi_cli"`. The logger can be accessed as follows:
+
+```python
+import logging
+
+logger = logging.getLogger("fmi_cli")
+logger.setLevel(logging.INFO)
+```
+
+If the level is set to `INFO` (or higher), `fmi_cli` will also print messages about splitting the queries due to api limits.
