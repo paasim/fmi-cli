@@ -79,7 +79,7 @@ class ObservableProperties:
 
     def find_by_id(self, id_: str) -> None | ObservableProperty:
         """Find observable property by id."""
-        return self.observation.get(id_, self.forecast.get(id_))
+        return self.observation.get(id_, self.forecast.get(id_.lower()))
 
     def find_matches(
         self,

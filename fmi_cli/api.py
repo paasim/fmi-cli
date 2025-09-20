@@ -11,7 +11,8 @@ from requests import get
 
 from fmi_cli.xml_helpers import parse_simple_features
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__package__)
+logger.addHandler(logging.StreamHandler())
 
 TS_FMT = "%FT%TZ"
 WFS_PARAMS = {"service": "WFS", "version": "2.0.0"}
@@ -82,7 +83,6 @@ def get_stored_query_chunked(  # noqa: PLR0913
     end_time: None | datetime,
     resolution: timedelta,
     parameters: None | list[str],
-    silent: bool = False,  # noqa: FBT001, FBT002
 ) -> Iterator[ET.Element]:
     """Get any stored query from FMI API.
 
@@ -97,16 +97,13 @@ def get_stored_query_chunked(  # noqa: PLR0913
         return
     lims = _mk_limits(start_time, end_time, resolution)
     start, end = next(lims)
-    if not silent:
-        logging.basicConfig(level=logging.INFO)
-        logger.info("querying for %s - %s", start, end)
+    logger.info("querying for %s - %s", start, end)
     yield get_stored_query(query_id, fmisid, start, end, resolution, parameters)
     for start, end in lims:
         # to ensure api limits (600 requests in 5 mins) are respected
         # (this should allow for sleeping only for 0.5 seconds)
         sleep(1)
-        if not silent:
-            logger.info("querying for %s - %s", start, end)
+        logger.info("querying for %s - %s", start, end)
         yield get_stored_query(query_id, fmisid, start, end, resolution, parameters)
 
 
