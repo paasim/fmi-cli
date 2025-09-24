@@ -18,7 +18,7 @@ TS_FMT = "%FT%TZ"
 WFS_PARAMS = {"service": "WFS", "version": "2.0.0"}
 WFS_PATH = "https://opendata.fmi.fi/wfs"
 META_PATH = "https://opendata.fmi.fi/meta"
-TIMEOUT = 20
+TIMEOUT = 60
 
 
 def _query(path: str, params: dict[str, str]) -> ET.Element:
@@ -144,7 +144,7 @@ def _mk_limits(
         msg = "higher resolution than an hour must divide the hour evenly"
         raise ValueError(msg)
     # at most a week of hourly data at a time
-    # - daily data could be downloaded year a time but 168 days is fine
+    # - daily data could be downloaded a year at a time but but i guess this is fine
     diff = timedelta(seconds=min(7 * 24 * 60 * 60 // secs, 168) * secs)
     start = start_time
     while start <= end_time:

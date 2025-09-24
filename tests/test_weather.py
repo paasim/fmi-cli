@@ -19,7 +19,7 @@ def slow_down_tests():
     time.sleep(1)
 
 
-def test_get_weather_chunked_accordingly():
+def test_get_weather_chunked_correctly():
     """Results contain all timestamps for all observations"""
     start_time = datetime(2025, 1, 1, tzinfo=UTC)
     end_time = datetime(2025, 1, 3, tzinfo=UTC)
@@ -77,3 +77,21 @@ def test_get_weather_forecast_resolution_and_retuns_values():
     is_nan = (isnan(v) for _, _, v in fc)
     assert mins == {0, 30}
     assert not all(is_nan)
+
+
+def test_get_weather_hourly_long():
+    """Daily weather works for long query period"""
+    start_time = datetime(2022, 1, 1, tzinfo=UTC)
+    end_time = datetime(2022, 2, 3, tzinfo=UTC)
+    w0 = get_weather(start_time=start_time, end_time=end_time)
+    n_temp_obs = sum(1 for w in w0 if w[1] == "t2m")
+    assert n_temp_obs == (end_time - start_time).total_seconds() // 60 // 60 + 1
+
+
+def test_get_weather_daily_long():
+    """Daily weather works for long query period"""
+    start_date = datetime(2022, 1, 1, tzinfo=UTC).date()
+    end_date = datetime(2023, 2, 1, tzinfo=UTC).date()
+    w0 = get_weather_daily(start_date=start_date, end_date=end_date)
+    n_temp_obs = sum(1 for w in w0 if w[1] == "tday")
+    assert n_temp_obs == (end_date - start_date).days + 1
