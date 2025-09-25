@@ -137,6 +137,8 @@ def _mk_limits(
     resolution: timedelta,
 ) -> Iterator[tuple[datetime, datetime]]:
     secs = resolution.total_seconds()
+    start_time = start_time.astimezone(UTC)
+    end_time = end_time.astimezone(UTC)
     if secs > 60 * 60 and (24 * 60 * 60) % secs != 0:
         msg = "lower resolution than an hour must divide 24 hours evenly"
         raise ValueError(msg)
