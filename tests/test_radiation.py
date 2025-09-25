@@ -34,5 +34,7 @@ def test_get_radiation_range():
 def test_get_radiation_forecast_values_in_future():
     """API returns values in the future values."""
     now = datetime.now(UTC)
-    in_future = (dt > now for dt, _, _ in get_radiation_forecast())
-    assert all(in_future)
+    forecast_timestamps = {dt for dt, _, _ in get_radiation_forecast()}
+    min_ts = min(forecast_timestamps)
+    for ts in forecast_timestamps:
+        assert ts == min_ts or ts > now  # at most one timestamp can be in the past
