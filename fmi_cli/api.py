@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from time import sleep
 from urllib.parse import urlencode
 
-from requests import get
+from requests import HTTPError, Response, get
 
 from fmi_cli.xml_helpers import parse_simple_features
 
@@ -21,9 +21,19 @@ META_PATH = "https://opendata.fmi.fi/meta"
 TIMEOUT = 60
 
 
+def _raise_for_status(resp: Response) -> None:
+    """Add HTTP error content as a note to the exception."""
+    try:
+        resp.raise_for_status()
+    except HTTPError as e:
+        if "text/xml" in resp.headers.get("Content-Type", ""):
+            e.add_note(resp.content.decode())
+        raise
+
+
 def _query(path: str, params: dict[str, str]) -> ET.Element:
     resp = get(path, params=urlencode(params, safe=":"), timeout=TIMEOUT)
-    resp.raise_for_status()
+    _raise_for_status(resp)
     return ET.fromstring(resp.content)  # noqa: S314
 
 
