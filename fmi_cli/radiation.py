@@ -2,8 +2,7 @@
 
 from datetime import datetime, timedelta
 
-from fmi_cli.api import get_meps_forecast, get_stored_query_chunked
-from fmi_cli.xml_helpers import parse_simple_features
+from fmi_cli.api import get_meps_forecast, get_stored_query_simple
 
 
 def get_radiation(
@@ -20,7 +19,7 @@ def get_radiation(
     * resolution can be changed to e.g. 1 minutes, but it must divide 1 hour
     * setting parameters as `None` returns the default set from the API
     """
-    obs = get_stored_query_chunked(
+    return get_stored_query_simple(
         "fmi::observations::radiation::simple",
         fmisid,
         start_time,
@@ -28,7 +27,6 @@ def get_radiation(
         resolution,
         parameters,
     )
-    return [(dt, k, v) for _, dt, k, v in parse_simple_features(obs)]
 
 
 def get_radiation_forecast(

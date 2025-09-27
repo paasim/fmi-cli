@@ -117,6 +117,44 @@ def get_stored_query_chunked(  # noqa: PLR0913
         yield get_stored_query(query_id, fmisid, start, end, resolution, parameters)
 
 
+def get_stored_query_simple(  # noqa: PLR0913
+    query_id: str,
+    fmisid: int,
+    start_time: None | datetime,
+    end_time: None | datetime,
+    resolution: timedelta,
+    parameters: None | list[str],
+) -> list[tuple[datetime, str, float]]:
+    """Get any stored query.
+
+    Split the query (= calls `get_stored_query_chunked`) into separate chunks if
+    the time range is too long. Parse the result assuming it the format is simple.
+    """
+    start_time = None if start_time is None else start_time.astimezone(UTC)
+    end_time = None if end_time is None else end_time.astimezone(UTC)
+    obs = get_stored_query_chunked(
+        query_id,
+        fmisid,
+        start_time,
+        end_time,
+        resolution,
+        parameters,
+    )
+    res = [(dt, k, v) for _, dt, k, v in parse_simple_features(obs)]
+    if start_time is not None and end_time is not None:
+        len_exp = (
+            end_time.timestamp() - start_time.timestamp()
+        ) / resolution.total_seconds()
+        if len_exp > len(res):
+            logger.warning(
+                "queried for %s observations but the API returned %s",
+                int(len_exp),
+                len(res),
+            )
+
+    return res
+
+
 def get_meps_forecast(
     fmisid: int,
     start_time: None | datetime = None,
@@ -130,7 +168,7 @@ def get_meps_forecast(
 
     Used by `get_weather_forecast` and `get_radiation_forecast`.
     """
-    fc = get_stored_query_chunked(
+    return get_stored_query_simple(
         "fmi::forecast::meps::surface::point::simple",
         fmisid,
         start_time,
@@ -138,7 +176,6 @@ def get_meps_forecast(
         resolution,
         parameters,
     )
-    return [(dt, k, v) for _, dt, k, v in parse_simple_features(fc)]
 
 
 def _mk_limits(

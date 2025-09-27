@@ -2,7 +2,7 @@
 
 from datetime import UTC, date, datetime, time, timedelta
 
-from fmi_cli.api import get_meps_forecast, get_stored_query, get_stored_query_chunked
+from fmi_cli.api import get_meps_forecast, get_stored_query, get_stored_query_simple
 from fmi_cli.xml_helpers import parse_simple_features
 
 
@@ -20,7 +20,7 @@ def get_weather(
     * resolution can be changed to e.g. 10 minutes, but it must divide 1 hour
     * setting parameters as `None` returns the default set from the API
     """
-    obs = get_stored_query_chunked(
+    return get_stored_query_simple(
         "fmi::observations::weather::simple",
         fmisid,
         start_time,
@@ -28,7 +28,6 @@ def get_weather(
         resolution,
         parameters,
     )
-    return [(dt, k, v) for _, dt, k, v in parse_simple_features(obs)]
 
 
 def get_weather_daily(
@@ -44,7 +43,7 @@ def get_weather_daily(
     * setting parameters as `None` returns the default set from the API
     """
     # Note that timedelta longer than 24 hours is not supported
-    obs = get_stored_query_chunked(
+    obs = get_stored_query_simple(
         "fmi::observations::weather::daily::simple",
         fmisid,
         None if start_date is None else datetime.combine(start_date, time(0), UTC),
@@ -52,7 +51,7 @@ def get_weather_daily(
         timedelta(hours=24),
         parameters,
     )
-    return [(dt.date(), k, v) for _, dt, k, v in parse_simple_features(obs)]
+    return [(dt.date(), k, v) for dt, k, v in obs]
 
 
 def get_weather_30year(
