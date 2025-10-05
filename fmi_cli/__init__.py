@@ -1,11 +1,13 @@
 from .airquality import get_airquality as get_airquality
+from .airquality import get_airquality_all as get_airquality_all
 from .airquality import get_airquality_forecast as get_airquality_forecast
 from .observable_property import ObservableProperties as ObservableProperties
 from .radiation import get_radiation as get_radiation
+from .radiation import get_radiation_all as get_radiation_all
 from .radiation import get_radiation_forecast as get_radiation_forecast
 from .station import Stations as Stations
 from .stored_query import StoredQueries as StoredQueries
 from .weather import get_weather as get_weather
 from .weather import get_weather_30year as get_weather_30year
-from .weather import get_weather_daily as get_weather_daily
+from .weather import get_weather_all as get_weather_all
 from .weather import get_weather_forecast as get_weather_forecast

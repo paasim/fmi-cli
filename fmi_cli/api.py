@@ -1,6 +1,7 @@
 """Helper methods for interacting with the API."""
 
 import logging
+import os
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -8,6 +9,7 @@ from time import sleep
 from urllib.parse import urlencode
 
 from requests import HTTPError, Response, get
+from requests.exceptions import Timeout
 
 from fmi_cli.xml_helpers import parse_multipoint_fmisids, parse_multipoint_points
 
@@ -18,7 +20,7 @@ TS_FMT = "%FT%TZ"
 WFS_PARAMS = {"service": "WFS", "version": "2.0.0"}
 WFS_PATH = "https://opendata.fmi.fi/wfs"
 META_PATH = "https://opendata.fmi.fi/meta"
-TIMEOUT = 60
+TIMEOUT = int(os.environ.get("FMI_CLI_TIMEOUT", "120"))
 CAP_NS = {"ns2": "http://www.opengis.net/ows/1.1"}
 
 
@@ -57,11 +59,12 @@ def get_capabilities() -> list[str]:
 
 def get_stored_query(  # noqa: PLR0913
     query_id: str,
-    fmisid: int,
+    place: int | tuple[float, float, float, float],
     start_time: None | datetime,
     end_time: None | datetime,
     resolution: None | timedelta,
-    parameters: None | list[str],
+    parameters: None | list[str] = None,
+    max_retries: int = 3,
 ) -> ET.Element:
     """Get any stored query from FMI API.
 
@@ -74,9 +77,14 @@ def get_stored_query(  # noqa: PLR0913
     """
     params = {
         "request": "getFeature",
-        "fmisid": str(fmisid),
         "storedquery_id": query_id,
     }
+    match place:
+        case int():
+            params["fmisid"] = str(place)
+        case tuple():
+            params["bbox"] = ",".join(str(x) for x in place)
+
     if start_time is not None:
         params["starttime"] = start_time.astimezone(UTC).strftime(TS_FMT)
     if end_time is not None:
@@ -85,7 +93,22 @@ def get_stored_query(  # noqa: PLR0913
         params["timestep"] = str(int(resolution.total_seconds() // 60))
     if parameters is not None and len(parameters) > 0:
         params["parameters"] = ",".join(parameters)
-    return query_wfs(params)
+    tries = 0
+    while True:
+        try:
+            return query_wfs(params)
+        except Timeout:
+            if tries >= max_retries:
+                raise
+            sleep(1)
+            logger.warning(
+                "%s for (%s) between %s and %s timed out",
+                query_id,
+                place,
+                params["starttime"],
+                params["endtime"],
+            )
+            tries += 1
 
 
 def get_stored_query_chunked(  # noqa: PLR0913
@@ -113,10 +136,44 @@ def get_stored_query_chunked(  # noqa: PLR0913
     yield get_stored_query(query_id, fmisid, start, end, resolution, parameters)
     for start, end in lims:
         # to ensure api limits (600 requests in 5 mins) are respected
-        # (this should allow for sleeping only for 0.5 seconds)
+        # (it should allow for sleeping only for 0.5 seconds)
         sleep(1)
         logger.info("querying for %s - %s", start, end)
         yield get_stored_query(query_id, fmisid, start, end, resolution, parameters)
+
+
+def get_stored_query_chunked_bbox(
+    query_id: str,
+    bboxes: list[tuple[float, float, float, float]],
+    start_time: None | datetime,
+    end_time: None | datetime,
+    resolution: timedelta,
+) -> Iterator[ET.Element]:
+    """Get any stored query from FMI API.
+
+    Splits the query into multiple chunks needed.
+
+    Resulting XML is returned as is.
+    """
+    if start_time is None or end_time is None:
+        for bbox in bboxes:
+            yield get_stored_query(query_id, bbox, start_time, end_time, resolution)
+            sleep(0.5)
+        return
+    lims = _mk_limits(start_time, end_time, resolution)
+    start, end = next(lims)
+    logger.info("querying for %s - %s", start, end)
+    for bbox in bboxes:
+        yield get_stored_query(query_id, bbox, start, end, resolution)
+        sleep(0.5)
+    for start, end in lims:
+        # to ensure api limits (600 requests in 5 mins) are respected
+        # (it should allow for sleeping only for 0.5 seconds)
+        sleep(1)
+        logger.info("querying for %s - %s", start, end)
+        for bbox in bboxes:
+            yield get_stored_query(query_id, bbox, start, end, resolution)
+            sleep(0.5)
 
 
 def get_stored_query_multipoint(  # noqa: PLR0913
@@ -150,14 +207,37 @@ def get_stored_query_multipoint(  # noqa: PLR0913
         len_exp = (
             end_time.timestamp() - start_time.timestamp()
         ) / resolution.total_seconds()
-        if len_exp > len(res):
+        if len_exp > len({dt for dt, _, _ in res}):
             logger.warning(
-                "queried for %s observations but the API returned %s",
+                "queried for values for %s timestamps but got %s",
                 int(len_exp),
                 len(res),
             )
 
     return res
+
+
+def get_stored_query_multipoint_all(
+    query_id: str,
+    start_time: None | datetime,
+    end_time: None | datetime,
+    resolution: timedelta,
+) -> Iterator[tuple[int, datetime, str, float]]:
+    """Get any stored query.
+
+    Split the query (= calls `get_stored_query_chunked`) into separate chunks if
+    the time range is too long.
+    """
+    start_time = None if start_time is None else start_time.astimezone(UTC)
+    end_time = None if end_time is None else end_time.astimezone(UTC)
+    obs = get_stored_query_chunked_bbox(
+        query_id + "::multipointcoverage",
+        grid_fi_bbox_parts(),
+        start_time,
+        end_time,
+        resolution,
+    )
+    yield from parse_multipoint_fmisids(obs)
 
 
 def get_meps_forecast(
@@ -181,6 +261,14 @@ def get_meps_forecast(
         resolution,
         parameters,
     )
+
+
+def grid_fi_bbox_parts() -> list[tuple[float, float, float, float]]:
+    """Bounding box that contains finland in parts that are not too big."""
+    lons = [(18, 21)]
+    lons.extend((lon, lon + 1) for lon in range(21, 28))
+    lons.append((28, 32))
+    return [(l0, 59, l1, 71) for l0, l1 in lons]
 
 
 def _mk_limits(
