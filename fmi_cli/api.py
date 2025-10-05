@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 
 from requests import HTTPError, Response, get
 
-from fmi_cli.xml_helpers import parse_simple_features
+from fmi_cli.xml_helpers import parse_multipoint_fmisids, parse_multipoint_points
 
 logger = logging.getLogger(__package__)
 logger.addHandler(logging.StreamHandler())
@@ -19,6 +19,7 @@ WFS_PARAMS = {"service": "WFS", "version": "2.0.0"}
 WFS_PATH = "https://opendata.fmi.fi/wfs"
 META_PATH = "https://opendata.fmi.fi/meta"
 TIMEOUT = 60
+CAP_NS = {"ns2": "http://www.opengis.net/ows/1.1"}
 
 
 def _raise_for_status(resp: Response) -> None:
@@ -50,7 +51,8 @@ def query_meta(params: dict[str, str]) -> ET.Element:
 def get_capabilities() -> list[str]:
     """List capabilities of the API."""
     cap = query_wfs({"request": "getCapabilities"})
-    return [o.attrib["name"] for o in cap.findall("{*}OperationsMetadata/{*}Operation")]
+    cap_path = "ns2:OperationsMetadata/ns2:Operation"
+    return [o.attrib["name"] for o in cap.findall(cap_path, CAP_NS)]
 
 
 def get_stored_query(  # noqa: PLR0913
@@ -117,7 +119,7 @@ def get_stored_query_chunked(  # noqa: PLR0913
         yield get_stored_query(query_id, fmisid, start, end, resolution, parameters)
 
 
-def get_stored_query_simple(  # noqa: PLR0913
+def get_stored_query_multipoint(  # noqa: PLR0913
     query_id: str,
     fmisid: int,
     start_time: None | datetime,
@@ -128,19 +130,22 @@ def get_stored_query_simple(  # noqa: PLR0913
     """Get any stored query.
 
     Split the query (= calls `get_stored_query_chunked`) into separate chunks if
-    the time range is too long. Parse the result assuming it the format is simple.
+    the time range is too long.
     """
     start_time = None if start_time is None else start_time.astimezone(UTC)
     end_time = None if end_time is None else end_time.astimezone(UTC)
     obs = get_stored_query_chunked(
-        query_id,
+        query_id + "::multipointcoverage",
         fmisid,
         start_time,
         end_time,
         resolution,
         parameters,
     )
-    res = [(dt, k, v) for _, dt, k, v in parse_simple_features(obs)]
+    parser = (
+        parse_multipoint_points if "forecast" in query_id else parse_multipoint_fmisids
+    )
+    res = [(dt, k, v) for _, dt, k, v in parser(obs)]
     if start_time is not None and end_time is not None:
         len_exp = (
             end_time.timestamp() - start_time.timestamp()
@@ -168,8 +173,8 @@ def get_meps_forecast(
 
     Used by `get_weather_forecast` and `get_radiation_forecast`.
     """
-    return get_stored_query_simple(
-        "fmi::forecast::meps::surface::point::simple",
+    return get_stored_query_multipoint(
+        "fmi::forecast::meps::surface::point",
         fmisid,
         start_time,
         end_time,

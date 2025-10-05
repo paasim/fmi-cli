@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 
-from fmi_cli.api import get_stored_query_simple
+from fmi_cli.api import get_stored_query_multipoint
 
 
 def get_airquality(
@@ -19,8 +19,8 @@ def get_airquality(
     * resolution can be changed, but it must be at least 1 hour and divide 24 hours
     * setting parameters as `None` returns the default set from the API
     """
-    return get_stored_query_simple(
-        "urban::observations::airquality::hourly::simple",
+    return get_stored_query_multipoint(
+        "urban::observations::airquality::hourly",
         fmisid,
         start_time,
         end_time,
@@ -43,8 +43,8 @@ def get_airquality_forecast(
     * resolution can be changed to e.g. 10 minutes, but it must divide 1 hour
     * setting parameters as `None` returns the default set from the API
     """
-    return get_stored_query_simple(
-        "fmi::forecast::silam::airquality::surface::point::simple",
+    return get_stored_query_multipoint(
+        "fmi::forecast::silam::airquality::surface::point",
         fmisid,
         start_time,
         end_time,

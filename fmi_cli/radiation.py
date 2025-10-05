@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 
-from fmi_cli.api import get_meps_forecast, get_stored_query_simple
+from fmi_cli.api import get_meps_forecast, get_stored_query_multipoint
 
 
 def get_radiation(
@@ -19,8 +19,8 @@ def get_radiation(
     * resolution can be changed to e.g. 1 minutes, but it must divide 1 hour
     * setting parameters as `None` returns the default set from the API
     """
-    return get_stored_query_simple(
-        "fmi::observations::radiation::simple",
+    return get_stored_query_multipoint(
+        "fmi::observations::radiation",
         fmisid,
         start_time,
         end_time,

@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from typing import Self
 
 from fmi_cli.api import query_meta
-from fmi_cli.xml_helpers import extract_attrib, extract_attrib_with_ns, extract_text
+from fmi_cli.xml_helpers import extract_attrib_ns, extract_elem_text
+
+PROP_NS = {
+    "ns0": "http://inspire.ec.europa.eu/schemas/omop/2.9",
+    "ns1": "http://www.opengis.net/gml/3.2",
+}
 
 
 @dataclass
@@ -23,18 +28,27 @@ class ObservableProperty:
     label: str
     base_phenomenon: str
     unit_of_measurement: str | None
+    statistical_measure: tuple[str, str] | None
 
     @classmethod
     def from_xml(cls, xml: ET.Element) -> Self:
         """Parse from xml."""
-        id_ = extract_attrib_with_ns(xml, "ObservableProperty", "id")
-        label = extract_text(xml, "ObservableProperty", "label")
-        base_phenomenon = extract_text(xml, "ObservableProperty", "basePhenomenon")
-        uom_f = xml.find("{*}uom")
-        unit_of_measurement = (
-            None if uom_f is None else extract_attrib(uom_f, "uom", "uom")
-        )
-        return cls(id_, label, base_phenomenon, unit_of_measurement)
+        id_ = extract_attrib_ns(xml, "id", "ns1", PROP_NS)
+        label = extract_elem_text(xml, "label", "ns0:label", PROP_NS)
+        phenomenon = extract_elem_text(xml, "phenomenon", "ns0:basePhenomenon", PROP_NS)
+        uom_e = xml.find("ns0:uom", PROP_NS)
+        unit_of_measurement = None if uom_e is None else uom_e.attrib.get("uom")
+        stat = xml.find("ns0:statisticalMeasure/ns0:StatisticalMeasure", PROP_NS)
+        if stat is not None:
+            fun_path = "ns0:statisticalFunction"
+            fun = extract_elem_text(stat, "function", fun_path, PROP_NS)
+            per_path = "ns0:aggregationTimePeriod"
+            period = extract_elem_text(stat, "period", per_path, PROP_NS)
+            statistical_measure = (fun, period)
+        else:
+            statistical_measure = None
+
+        return cls(id_, label, phenomenon, unit_of_measurement, statistical_measure)
 
     def matches(self, query: re.Pattern) -> bool:
         """Check if any field matches the query."""
@@ -58,7 +72,7 @@ class ObservableProperty:
 
 def _get_properties(prop: str) -> dict[str, ObservableProperty]:
     props = query_meta({"observableProperty": prop})
-    props = props.findall("{*}component/{*}ObservableProperty")
+    props = props.findall("ns0:component/ns0:ObservableProperty", PROP_NS)
     props = (ObservableProperty.from_xml(e) for e in props)
     return {p.id: p for p in props}
 
