@@ -2,8 +2,8 @@
 
 from datetime import UTC, date, datetime, time, timedelta
 
-from fmi_cli.api import get_meps_forecast, get_stored_query, get_stored_query_simple
-from fmi_cli.xml_helpers import parse_simple_features
+from fmi_cli.api import get_meps_forecast, get_stored_query, get_stored_query_multipoint
+from fmi_cli.xml_helpers import parse_multipoint_fmisids
 
 
 def get_weather(
@@ -20,8 +20,8 @@ def get_weather(
     * resolution can be changed to e.g. 10 minutes, but it must divide 1 hour
     * setting parameters as `None` returns the default set from the API
     """
-    return get_stored_query_simple(
-        "fmi::observations::weather::simple",
+    return get_stored_query_multipoint(
+        "fmi::observations::weather",
         fmisid,
         start_time,
         end_time,
@@ -43,8 +43,8 @@ def get_weather_daily(
     * setting parameters as `None` returns the default set from the API
     """
     # Note that timedelta longer than 24 hours is not supported
-    obs = get_stored_query_simple(
-        "fmi::observations::weather::daily::simple",
+    obs = get_stored_query_multipoint(
+        "fmi::observations::weather::daily",
         fmisid,
         None if start_date is None else datetime.combine(start_date, time(0), UTC),
         None if end_date is None else datetime.combine(end_date, time(0), UTC),
@@ -71,14 +71,14 @@ def get_weather_30year(
     """
     # this should never get chunked so its fine
     obs = get_stored_query(
-        "fmi::observations::weather::monthly::30year::simple",
+        "fmi::observations::weather::monthly::30year::multipointcoverage",
         fmisid,
         None if start_date is None else datetime.combine(start_date, time(0), UTC),
         None if end_date is None else datetime.combine(end_date, time(0), UTC),
         None,
         None,
     )
-    return [(dt.date(), k, v) for _, dt, k, v in parse_simple_features([obs])]
+    return [(dt.date(), k, v) for _, dt, k, v in parse_multipoint_fmisids([obs])]
 
 
 def get_weather_forecast(

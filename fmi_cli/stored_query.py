@@ -7,7 +7,18 @@ from dataclasses import dataclass
 from typing import Self
 
 from fmi_cli.api import query_wfs
-from fmi_cli.xml_helpers import extract_attrib, extract_text
+from fmi_cli.xml_helpers import extract_elem_text
+
+QUERY_NS = {
+    "ns0": "http://www.opengis.net/wfs/2.0",
+}
+
+
+def _get_attrib(elem: ET.Element, attrib_name: str, elem_name: str) -> str:
+    if (x := elem.attrib.get(attrib_name)) is None:
+        msg = f"{attrib_name} missing for {elem_name}"
+        raise ValueError(msg)
+    return x
 
 
 @dataclass
@@ -22,11 +33,18 @@ class Param:
     @classmethod
     def from_xml(cls, xml: ET.Element) -> Self:
         """Parse from XML."""
-        name = extract_attrib(xml, "Parameter", "name")
-        type_ = extract_attrib(xml, "Parameter", "type")
-        title = extract_text(xml, "Parameter", "Title")
-        abstract = extract_text(xml, "Parameter", "Abstract")
+        name = _get_attrib(xml, "name", "Parameter")
+        type_ = _get_attrib(xml, "type", "Parameter")
+        title = extract_elem_text(xml, "title", "ns0:Title", QUERY_NS)
+        abstract = extract_elem_text(xml, "abstract", "ns0:Abstract", QUERY_NS)
         return cls(name, type_, title, abstract)
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over the fields."""
+        yield self.name
+        yield self.type_
+        yield self.title
+        yield self.abstract
 
     def __str__(self) -> str:
         """Return a string representation."""
@@ -34,20 +52,18 @@ class Param:
 
 
 def _parse_stored_query(xml: ET.Element) -> tuple[str, tuple[str, str]]:
-    id_ = extract_attrib(xml, "StoredQuery", "id")
-    elem_name = f"StoredQuery for {id_}"
-    title = extract_text(xml, elem_name, "Title")
-    ret_type = extract_text(xml, elem_name, "ReturnFeatureType")
+    id_ = _get_attrib(xml, "id", "StoredQuery")
+    title = extract_elem_text(xml, "title", "ns0:Title", QUERY_NS)
+    ret_type = extract_elem_text(xml, "return type", "ns0:ReturnFeatureType", QUERY_NS)
     return id_, (title, ret_type)
 
 
 def _parse_description(
     xml: ET.Element,
 ) -> tuple[str, tuple[str, list[Param]]]:
-    id_ = extract_attrib(xml, "StoredQueryDescription ", "id")
-    elem_name = f"StoredQueryDescription for {id_}"
-    abstract = extract_text(xml, elem_name, "Abstract")
-    params = [Param.from_xml(p) for p in xml.findall("{*}Parameter")]
+    id_ = _get_attrib(xml, "id", "StoredQueryDescription")
+    abstract = extract_elem_text(xml, "description", "ns0:Abstract", QUERY_NS)
+    params = [Param.from_xml(p) for p in xml.findall("ns0:Parameter", QUERY_NS)]
     return id_, (abstract, params)
 
 
@@ -97,10 +113,11 @@ class StoredQueries:
     @classmethod
     def get(cls) -> Self:
         """Construct the element by querying the API."""
-        queries = query_wfs({"request": "listStoredQueries"}).findall("{*}StoredQuery")
         descr = query_wfs({"request": "describeStoredQueries"})
-        descr = map(_parse_description, descr.findall("{*}StoredQueryDescription"))
-        descr = dict(descr)
+        descr_path = "ns0:StoredQueryDescription"
+        descr = dict(map(_parse_description, descr.findall(descr_path, QUERY_NS)))
+        queries_elem = query_wfs({"request": "listStoredQueries"})
+        queries = queries_elem.findall("ns0:StoredQuery", QUERY_NS)
         qs = (StoredQuery.from_xml(e, descr) for e in queries)
         return cls({q.id: q for q in qs})
 
