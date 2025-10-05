@@ -7,7 +7,7 @@ import pytest
 from fmi_cli import (
     get_weather,
     get_weather_30year,
-    get_weather_daily,
+    get_weather_all,
     get_weather_forecast,
 )
 
@@ -50,18 +50,6 @@ def test_get_weather_chunked_correctly():
         assert times == times_exp
 
 
-def test_get_weather_daily_fmisid():
-    """Results depend on fmisid"""
-    w0 = get_weather_daily()
-    time.sleep(1)
-    w1 = get_weather_daily(fmisid=101004)
-    # same observations but different values
-    for (t0, k0, _), (t1, k1, _) in zip(w0, w1, strict=True):
-        assert t0 == t1
-        assert k0 == k1
-    assert [x[0] for x in w0] != [x[1] for x in w1]
-
-
 def test_get_weather_30year_is_1991():
     """Results depend on fmisid"""
     years = {dt.year for dt, _, _ in get_weather_30year()}
@@ -88,10 +76,11 @@ def test_get_weather_hourly_long():
     assert n_temp_obs == (end_time - start_time).total_seconds() // 60 // 60 + 1
 
 
-def test_get_weather_daily_long():
-    """Daily weather works for long query period"""
-    start_date = datetime(2022, 1, 1, tzinfo=UTC).date()
-    end_date = datetime(2023, 2, 1, tzinfo=UTC).date()
-    w0 = get_weather_daily(start_date=start_date, end_date=end_date)
-    n_temp_obs = sum(1 for w in w0 if w[1] == "tday")
-    assert n_temp_obs == (end_date - start_date).days + 1
+def test_weather_all():
+    """API returns obs for many stations."""
+    wttr_all = list(get_weather_all())
+
+    # multiple fmisids
+    fmisids = {x[0] for x in wttr_all}
+    fmisids_at_least = 150
+    assert len(fmisids) > fmisids_at_least

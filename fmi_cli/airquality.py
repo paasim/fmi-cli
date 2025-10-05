@@ -1,8 +1,9 @@
 """Air quality observations and forecasts."""
 
+from collections.abc import Iterator
 from datetime import datetime, timedelta
 
-from fmi_cli.api import get_stored_query_multipoint
+from fmi_cli.api import get_stored_query_multipoint, get_stored_query_multipoint_all
 
 
 def get_airquality(
@@ -26,6 +27,20 @@ def get_airquality(
         end_time,
         resolution,
         parameters,
+    )
+
+
+def get_airquality_all(
+    start_time: None | datetime = None,
+    end_time: None | datetime = None,
+    resolution: timedelta = timedelta(hours=1),
+) -> Iterator[tuple[int, datetime, str, float]]:
+    """Get all (hourly) airquality observations."""
+    return get_stored_query_multipoint_all(
+        "urban::observations::airquality::hourly",
+        start_time,
+        end_time,
+        resolution,
     )
 
 

@@ -1,8 +1,14 @@
 """Weather observations and forecasts."""
 
+from collections.abc import Iterator
 from datetime import UTC, date, datetime, time, timedelta
 
-from fmi_cli.api import get_meps_forecast, get_stored_query, get_stored_query_multipoint
+from fmi_cli.api import (
+    get_meps_forecast,
+    get_stored_query,
+    get_stored_query_multipoint,
+    get_stored_query_multipoint_all,
+)
 from fmi_cli.xml_helpers import parse_multipoint_fmisids
 
 
@@ -30,28 +36,18 @@ def get_weather(
     )
 
 
-def get_weather_daily(
-    fmisid: int = 100971,
-    start_date: None | date = None,
-    end_date: None | date = None,
-    parameters: None | list[str] = None,
-) -> list[tuple[date, str, float]]:
-    """Get daily weather observations.
-
-    notes on params:
-    * fmisid defaults to `100971` which is Helsinki Kaisaniemi station
-    * setting parameters as `None` returns the default set from the API
-    """
-    # Note that timedelta longer than 24 hours is not supported
-    obs = get_stored_query_multipoint(
-        "fmi::observations::weather::daily",
-        fmisid,
-        None if start_date is None else datetime.combine(start_date, time(0), UTC),
-        None if end_date is None else datetime.combine(end_date, time(0), UTC),
-        timedelta(hours=24),
-        parameters,
+def get_weather_all(
+    start_time: None | datetime = None,
+    end_time: None | datetime = None,
+    resolution: timedelta = timedelta(hours=1),
+) -> Iterator[tuple[int, datetime, str, float]]:
+    """Get all (hourly) weather observations."""
+    return get_stored_query_multipoint_all(
+        "fmi::observations::weather",
+        start_time,
+        end_time,
+        resolution,
     )
-    return [(dt.date(), k, v) for dt, k, v in obs]
 
 
 def get_weather_30year(

@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from fmi_cli import get_airquality, get_airquality_forecast
+from fmi_cli import get_airquality, get_airquality_all, get_airquality_forecast
 
 
 @pytest.fixture(autouse=True)
@@ -22,11 +22,26 @@ def test_get_airquality_params():
 
 def test_get_airquality_forecast_fmisid():
     """Results depend on fmisid"""
-    w0 = get_airquality_forecast()
+    obs_default_fmisid = {(ts, k): v for ts, k, v in get_airquality_forecast()}
     time.sleep(1)
-    w1 = get_airquality_forecast(fmisid=101932)
-    # same observations but different values
-    for (t0, k0, _), (t1, k1, _) in zip(w0, w1, strict=True):
-        assert t0 == t1
-        assert k0 == k1
-    assert [x[0] for x in w0] != [x[1] for x in w1]
+    matching_keys = 0
+    differing_vals = 0
+    for ts, k, v in get_airquality_forecast(fmisid=103097):
+        if (ts, k) not in obs_default_fmisid:
+            continue
+        matching_keys += 1
+        if obs_default_fmisid[(ts, k)] != v:
+            differing_vals += 1
+    # there must be overlap in keys and values that differ
+    assert matching_keys > 1
+    assert differing_vals > 1
+
+
+def test_airquality_all():
+    """API returns obs for many stations."""
+    aq_all = list(get_airquality_all())
+
+    # multiple fmisids
+    fmisids = {x[0] for x in aq_all}
+    fmisids_at_least = 80
+    assert len(fmisids) > fmisids_at_least

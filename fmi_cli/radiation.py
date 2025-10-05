@@ -1,8 +1,13 @@
 """Solar radiation observations and forecasts."""
 
+from collections.abc import Iterator
 from datetime import datetime, timedelta
 
-from fmi_cli.api import get_meps_forecast, get_stored_query_multipoint
+from fmi_cli.api import (
+    get_meps_forecast,
+    get_stored_query_multipoint,
+    get_stored_query_multipoint_all,
+)
 
 
 def get_radiation(
@@ -26,6 +31,20 @@ def get_radiation(
         end_time,
         resolution,
         parameters,
+    )
+
+
+def get_radiation_all(
+    start_time: None | datetime = None,
+    end_time: None | datetime = None,
+    resolution: timedelta = timedelta(hours=1),
+) -> Iterator[tuple[int, datetime, str, float]]:
+    """Get all (hourly) solar radiation observations."""
+    return get_stored_query_multipoint_all(
+        "fmi::observations::radiation",
+        start_time,
+        end_time,
+        resolution,
     )
 
 
