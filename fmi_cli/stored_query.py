@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Self
 
-from fmi_cli.api import query_wfs
+from fmi_cli.api import init_session, query_wfs
 from fmi_cli.xml_helpers import extract_elem_text
 
 QUERY_NS = {
@@ -113,10 +113,11 @@ class StoredQueries:
     @classmethod
     def get(cls) -> Self:
         """Construct the element by querying the API."""
-        descr = query_wfs({"request": "describeStoredQueries"})
+        with init_session() as s:
+            descr = query_wfs({"request": "describeStoredQueries"}, s)
+            queries_elem = query_wfs({"request": "listStoredQueries"}, s)
         descr_path = "ns0:StoredQueryDescription"
         descr = dict(map(_parse_description, descr.findall(descr_path, QUERY_NS)))
-        queries_elem = query_wfs({"request": "listStoredQueries"})
         queries = queries_elem.findall("ns0:StoredQuery", QUERY_NS)
         qs = (StoredQuery.from_xml(e, descr) for e in queries)
         return cls({q.id: q for q in qs})

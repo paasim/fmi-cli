@@ -133,4 +133,4 @@ class Stations:
 
 def _get_stations() -> ET.Element:
     params = {"request": "getFeature", "storedquery_id": "fmi::ef::stations"}
-    return query_wfs(params)
+    return query_wfs(params, None)
